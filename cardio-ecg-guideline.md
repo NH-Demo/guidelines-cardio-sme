@@ -4,7 +4,7 @@
 
 ## Core Triage Thresholds
 - Resting Heart Rate Normal: 55 - 90 bpm
-- Tachycardia Alert Threshold: > 100 bpm
+- Tachycardia Alert Threshold: > 105 bpm
 - QT Interval Alert: QTc > 450 ms (Male), > 460 ms (Female)
 
 ## Specialist Recommendation
