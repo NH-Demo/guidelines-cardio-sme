@@ -1,0 +1,60 @@
+name: Sync Guideline to Parent Repo
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '*.md' # Only runs when clinical markdown files are modified
+
+jobs:
+  sync-changes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Child Repo
+        uses: actions/checkout@v4
+
+      - name: Checkout Parent Repository
+        uses: actions/checkout@v4
+        with:
+          repository: 'NH-Demo/clinical-framework-demo2'
+          token: ${{ secrets.SYNC_PAT }}
+          path: parent-repo
+
+      - name: Copy Files and Create PR in Parent
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_PAT }}
+        run: |
+          cd parent-repo
+          
+          # Create target folder inside parent repo
+          mkdir -p projects/cardiology
+          
+          # Copy the updated markdown guideline from child into parent
+          cp ../cardio-ecg-guideline.md projects/cardiology/
+          
+          # Configure Git Author
+          git config user.name "Neko Clinical Automation Bot"
+          git config user.email "bot@nekohealth.com"
+          
+          # Create a branch for the PR
+          BRANCH_NAME="sync/cardio-sme-$(date +%s)"
+          git checkout -b $BRANCH_NAME
+          
+          git add projects/cardiology/cardio-ecg-guideline.md
+          
+          # Check if there are differences to commit
+          if git diff --staged --quiet; then
+            echo "No changes detected. Skipping PR."
+            exit 0
+          fi
+          
+          git commit -m "Clinical Update: Inbound changes from Dr. Alistair (Cardio SME)"
+          git push origin $BRANCH_NAME
+          
+          # Create Pull Request in the Parent Repo
+          gh pr create \
+            --title "Clinical Review: Inbound ECG Guideline from Dr. Alistair Vance (SME)" \
+            --body "Automated sync from child repository **guidelines-cardio-sme**.\n\nPlease review clinical thresholds and sign off." \
+            --base main \
+            --head $BRANCH_NAME
