@@ -1,11 +1,10 @@
 name: Sync Guideline to Parent Repo
 
 on:
+  workflow_dispatch: # Allows manual trigger via "Run workflow" button in GitHub Actions tab
   push:
     branches:
       - main
-    paths:
-      - '*.md' # Only runs when clinical markdown files are modified
 
 jobs:
   sync-changes:
@@ -20,41 +19,45 @@ jobs:
           repository: 'NH-Demo/clinical-framework-demo2'
           token: ${{ secrets.SYNC_PAT }}
           path: parent-repo
+          fetch-depth: 0
 
       - name: Copy Files and Create PR in Parent
         env:
           GH_TOKEN: ${{ secrets.SYNC_PAT }}
         run: |
+          # 1. Ensure target directory exists in parent repo
+          mkdir -p parent-repo/projects/cardiology
+          
+          # 2. Copy markdown guidelines from child into parent
+          # (Copies any .md file found in the root of child repo)
+          cp -u *.md parent-repo/projects/cardiology/ 2>/dev/null || cp *.md parent-repo/projects/cardiology/
+          
           cd parent-repo
           
-          # Create target folder inside parent repo
-          mkdir -p projects/cardiology
-          
-          # Copy the updated markdown guideline from child into parent
-          cp ../cardio-ecg-guideline.md projects/cardiology/
-          
-          # Configure Git Author
+          # 3. Configure Git identity
           git config user.name "Neko Clinical Automation Bot"
           git config user.email "bot@nekohealth.com"
           
-          # Create a branch for the PR
+          # 4. Create a unique branch name
           BRANCH_NAME="sync/cardio-sme-$(date +%s)"
-          git checkout -b $BRANCH_NAME
+          git checkout -b "$BRANCH_NAME"
           
-          git add projects/cardiology/cardio-ecg-guideline.md
+          git add projects/cardiology/
           
-          # Check if there are differences to commit
+          # 5. Check if there are actual diffs
           if git diff --staged --quiet; then
-            echo "No changes detected. Skipping PR."
+            echo "No changes detected between child and parent. Nothing to sync."
             exit 0
           fi
           
           git commit -m "Clinical Update: Inbound changes from Dr. Alistair (Cardio SME)"
-          git push origin $BRANCH_NAME
+          git push origin "$BRANCH_NAME"
           
-          # Create Pull Request in the Parent Repo
+          # 6. Open Pull Request in Parent
           gh pr create \
             --title "Clinical Review: Inbound ECG Guideline from Dr. Alistair Vance (SME)" \
             --body "Automated sync from child repository **guidelines-cardio-sme**.\n\nPlease review clinical thresholds and sign off." \
             --base main \
-            --head $BRANCH_NAME
+            --head "$BRANCH_NAME"
+          
+          echo "PR successfully created in parent repository!"
